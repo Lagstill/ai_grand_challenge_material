@@ -1,0 +1,86 @@
+version: "3.8"
+
+services:
+  # Ollama for local LLM serving
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Uncomment for GPU support
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Ray head node
+  ray-head:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ray-head
+    ports:
+      - "8000:8000"   # Ray Serve endpoint
+      - "8265:8265"   # Ray Dashboard
+      - "6379:6379"   # Ray GCS
+    environment:
+      - RAY_HEAD_ADDRESS=ray-head:6379
+      - OLLAMA_HOST=ollama:11434
+    command: >
+      bash -c "ray start --head --dashboard-host=0.0.0.0 --port=6379 --block"
+    depends_on:
+      - ollama
+    healthcheck:
+      test: ["CMD", "ray", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Ray worker nodes (scale these)
+  ray-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - RAY_HEAD_ADDRESS=ray-head:6379
+      - OLLAMA_HOST=ollama:11434
+    command: >
+      bash -c "ray start --address=ray-head:6379 --block"
+    depends_on:
+      - ray-head
+    deploy:
+      replicas: 2
+
+  # Ray Serve deployment
+  ray-serve:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ray-serve
+    environment:
+      - RAY_HEAD_ADDRESS=ray-head:6379
+      - OLLAMA_HOST=ollama:11434
+    command: >
+      bash -c "
+        sleep 10 &&
+        ray start --address=ray-head:6379 &&
+        python deploy_all.py
+      "
+    depends_on:
+      - ray-head
+      - ollama
+    volumes:
+      - ./:/app
+
+volumes:
+  ollama_data:

@@ -1,0 +1,47 @@
+[
+  {
+    "question": "What is the main vulnerability class in OpenSSL 3.0?",
+    "answer": "Buffer overflows and infinite loop vulnerabilities in certificate parsing, notably in BN_mod_sqrt and X.509 verification.",
+    "contexts": [
+      "OpenSSL 3.0 introduced a new provider architecture that replaced the legacy engine API.",
+      "CVE-2022-0778 describes an infinite loop in BN_mod_sqrt() triggered by a certificate with a non-prime modulus. This affects all OpenSSL 3.0 versions before 3.0.2.",
+      "CVE-2022-3786 and CVE-2022-3602 are buffer overflow vulnerabilities in the X.509 certificate verification code introduced in OpenSSL 3.0."
+    ]
+  },
+  {
+    "question": "How does AIS data help in maritime domain awareness?",
+    "answer": "AIS provides vessel identity, position, speed, and course data which enables tracking, anomaly detection, and correlation with SAR imagery.",
+    "contexts": [
+      "Automatic Identification System (AIS) transmits vessel identity (MMSI, name, flag), position (lat/lon), speed over ground, course, and destination.",
+      "AIS data fusion with satellite imagery involves correlating AIS-reported positions with detected vessel signatures in SAR or optical imagery to identify dark vessels.",
+      "Anomalies in AIS data — such as gaps in transmission, unusual speed changes, or impossible position jumps — are indicators of spoofing or intentional disabling."
+    ]
+  },
+  {
+    "question": "What is training-serving skew and why does it matter?",
+    "answer": "Training-serving skew occurs when data preprocessing differs between training and production, causing the model to receive inputs it was never trained on, silently degrading performance.",
+    "contexts": [
+      "Training-serving skew is a class of production ML bugs where the feature engineering or preprocessing pipeline produces different outputs in the training environment versus the serving environment.",
+      "Common causes include: different library versions, different handling of null values, different normalisation logic, and different tokenisation behaviour across training and inference codebases.",
+      "Uber's Michelangelo platform addressed training-serving skew by enforcing a single shared feature store used by both the training pipeline and the online serving system."
+    ]
+  },
+  {
+    "question": "What does RAGAS faithfulness measure?",
+    "answer": "Faithfulness measures whether each claim in the generated answer can be inferred from the provided context, detecting hallucinations that introduce unsupported information.",
+    "contexts": [
+      "RAGAS faithfulness is defined as the ratio of claims in the generated answer that are supported by the retrieved context to the total number of claims in the answer.",
+      "A faithfulness score of 1.0 means every statement in the answer is grounded in the retrieved passages. A score below 0.7 typically indicates significant hallucination.",
+      "Faithfulness is evaluated by an LLM judge that extracts atomic claims from the answer and verifies each one against the provided context documents."
+    ]
+  },
+  {
+    "question": "How does QLoRA reduce memory requirements for fine-tuning?",
+    "answer": "QLoRA combines 4-bit quantisation of the frozen base model with low-rank adapter training, allowing fine-tuning of 7B+ models on a single consumer GPU.",
+    "contexts": [
+      "QLoRA (Quantised Low-Rank Adaptation) loads the base model weights in 4-bit NormalFloat (NF4) format, reducing memory by approximately 4x compared to 16-bit loading.",
+      "Only the LoRA adapter weights are trained in 16-bit precision. The base model remains frozen and quantised throughout training, with gradient computation using bfloat16.",
+      "QLoRA enables fine-tuning of a 7B parameter model in approximately 6GB of GPU VRAM, making it practical on a single RTX 3090 or RTX 4090."
+    ]
+  }
+]

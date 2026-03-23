@@ -1,0 +1,83 @@
+# Docker Compose for Live Demo
+# ============================
+# 
+# Usage:
+#   # Start single worker
+#   docker compose -f docker-compose.demo.yml up -d
+#
+#   # Scale to 3 workers
+#   docker compose -f docker-compose.demo.yml up -d --scale whisper-api=3
+#
+#   # Watch logs with request distribution
+#   docker compose -f docker-compose.demo.yml logs -f whisper-api | grep "POST /transcribe"
+#
+#   # Load test through nginx
+#   locust -f ../stage2_load_test_fail/locustfile.py --host=http://localhost --headless \
+#          --users 15 --spawn-rate 5 --run-time 60s --only-summary
+
+services:
+  # ===========================================
+  # WHISPER API WORKERS
+  # ===========================================
+  whisper-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - WHISPER_MODEL=base
+      - COMPUTE_TYPE=int8
+      - MAX_WORKERS=2
+      - MAX_QUEUE_SIZE=20
+      - REQUEST_TIMEOUT=120
+      - LOG_LEVEL=INFO
+    volumes:
+      - ../../audio_samples:/app/audio_samples:ro
+      - whisper_cache:/root/.cache
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  # ===========================================
+  # NGINX LOAD BALANCER
+  # ===========================================
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx-demo.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - whisper-api
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ===========================================
+  # LOCUST WEB UI (Optional)
+  # ===========================================
+  locust:
+    image: locustio/locust:2.20.0
+    ports:
+      - "8089:8089"
+    volumes:
+      - ../stage2_load_test_fail/locustfile.py:/mnt/locust/locustfile.py:ro
+      - ../../audio_samples:/mnt/locust/audio_samples:ro
+    command: -f /mnt/locust/locustfile.py --host=http://nginx
+    depends_on:
+      - nginx
+    profiles:
+      - testing
+
+volumes:
+  whisper_cache:

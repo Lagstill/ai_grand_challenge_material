@@ -1,0 +1,50 @@
+# Stage 2: Docker Compose for Load Testing
+# Run both the API and Locust together
+
+version: '3.8'
+
+services:
+  # The naive API from Stage 1
+  whisper-api:
+    build:
+      context: ../stage1_naive_api
+    ports:
+      - "8000:8000"
+    # No resource limits - let it eat all resources
+    # This is intentional to show the problem
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - ../../audio_samples:/app/audio_samples:ro
+
+  # Locust for load testing
+  locust-master:
+    image: locustio/locust:2.20.0
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./locustfile.py:/mnt/locust/locustfile.py
+      - ../../audio_samples:/mnt/locust/audio_samples:ro
+    command: -f /mnt/locust/locustfile.py --master -H http://whisper-api:8000
+    depends_on:
+      - whisper-api
+
+  # Optional: Locust workers for distributed testing
+  locust-worker:
+    image: locustio/locust:2.20.0
+    volumes:
+      - ./locustfile.py:/mnt/locust/locustfile.py
+      - ../../audio_samples:/mnt/locust/audio_samples:ro
+    command: -f /mnt/locust/locustfile.py --worker --master-host locust-master
+    depends_on:
+      - locust-master
+    deploy:
+      replicas: 2  # 2 worker processes
+
+# Usage:
+# docker compose up --build
+# Open http://localhost:8089 for Locust UI
+# Open http://localhost:8000/docs for API docs

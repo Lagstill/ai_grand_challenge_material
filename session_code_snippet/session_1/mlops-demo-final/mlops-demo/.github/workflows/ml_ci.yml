@@ -1,0 +1,142 @@
+# .github/workflows/ml_ci.yml
+#
+# The PR gate. This is what makes MLOps real.
+#
+# What this does:
+#   1. Triggered on every PR to main
+#   2. Runs the RAGAS eval suite against the PR's prompt/model changes
+#   3. Compares scores against the baseline in main (metrics.json on main branch)
+#   4. Blocks the PR if any metric regresses beyond the allowed tolerance
+#   5. Posts a metrics summary as a PR comment — no digging through logs
+#
+# The result: a model change that degrades faithfulness by >3% cannot be
+# merged. Ever. Not by accident, not by a tired teammate at 2am.
+# This is the Michelangelo safety score concept, for a team of 3.
+
+name: ML Eval Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "prompts/**"
+      - "config/**"
+      - "data/**"
+
+jobs:
+  eval:
+    name: Run RAGAS Eval & Check Regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+
+      # ── 1. Checkout the PR branch ──────────────────────────────────────────
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+
+      # ── 2. Set up Python ───────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # ── 3. Install dependencies ────────────────────────────────────────────
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ── 4. Run eval on PR branch ───────────────────────────────────────────
+      - name: Run eval (PR branch)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          WANDB_API_KEY:  ${{ secrets.WANDB_API_KEY }}
+        run: |
+          python src/eval.py \
+            --prompt-version $(python -c "import yaml; c=yaml.safe_load(open('config/train_config.yaml')); print(c['data']['prompt_version'])") \
+            --output evals/metrics_pr.json
+
+      # ── 5. Fetch baseline metrics from main branch ─────────────────────────
+      - name: Fetch baseline metrics from main
+        run: |
+          git fetch origin main
+          git show origin/main:evals/metrics.json > evals/metrics_baseline.json 2>/dev/null \
+            || echo '{"scores": {}}' > evals/metrics_baseline.json
+
+      # ── 6. Compare PR vs baseline — this is the gate ──────────────────────
+      - name: Check for regression
+        id: regression_check
+        run: |
+          python - <<'EOF'
+          import json, sys
+
+          REGRESSION_TOLERANCE = 0.03   # allow up to 3% drop per metric
+
+          with open("evals/metrics_pr.json") as f:
+              pr = json.load(f)
+          with open("evals/metrics_baseline.json") as f:
+              baseline = json.load(f)
+
+          pr_scores       = pr["scores"]
+          baseline_scores = baseline.get("scores", {})
+
+          regressions = []
+          improvements = []
+          summary_lines = ["| Metric | Baseline | PR | Delta | Status |",
+                           "|--------|----------|----|-------|--------|"]
+
+          for metric, pr_score in pr_scores.items():
+              base_score = baseline_scores.get(metric, pr_score)  # no baseline = pass
+              delta = pr_score - base_score
+              regressed = delta < -REGRESSION_TOLERANCE
+
+              status = "🔴 REGRESSED" if regressed else ("🟢 improved" if delta > 0.01 else "⚪ stable")
+              summary_lines.append(
+                  f"| {metric} | {base_score:.3f} | {pr_score:.3f} | {delta:+.3f} | {status} |"
+              )
+
+              if regressed:
+                  regressions.append(f"{metric}: {base_score:.3f} → {pr_score:.3f} (Δ{delta:+.3f})")
+              elif delta > 0.01:
+                  improvements.append(f"{metric}: {base_score:.3f} → {pr_score:.3f} (Δ{delta:+.3f})")
+
+          # Write summary for the PR comment step
+          with open("evals/regression_summary.md", "w") as f:
+              f.write("## ML Eval Results\n\n")
+              f.write("\n".join(summary_lines))
+              f.write("\n\n")
+              if regressions:
+                  f.write("### ❌ Regressions detected\n")
+                  for r in regressions:
+                      f.write(f"- {r}\n")
+              elif improvements:
+                  f.write("### ✅ All metrics passed. Improvements detected:\n")
+                  for i in improvements:
+                      f.write(f"- {i}\n")
+              else:
+                  f.write("### ✅ All metrics stable\n")
+
+          if regressions:
+              print(f"REGRESSION DETECTED: {regressions}")
+              sys.exit(1)   # <── This fails the PR check
+          else:
+              print("All metrics passed regression check.")
+          EOF
+
+      # ── 7. Post metrics as a PR comment ───────────────────────────────────
+      # Every PR gets a metrics table. No digging through logs.
+      - name: Post eval summary to PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: always()   # post even if regression check failed
+        with:
+          path: evals/regression_summary.md
+
+      # ── 8. Upload artifacts for debugging ─────────────────────────────────
+      - name: Upload eval artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-results
+          path: evals/
+          retention-days: 30

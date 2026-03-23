@@ -1,0 +1,15 @@
+# Stage 4: Advanced Optimizations
+fastapi==0.109.0
+uvicorn==0.27.0
+python-multipart==0.0.6
+
+# Optimized inference
+faster-whisper==1.0.1
+
+# Monitoring
+psutil==5.9.7
+
+# Optional: For even smaller model (Distil-Whisper)
+# Note: Distil-Whisper requires transformers
+# transformers>=4.36.0
+# accelerate>=0.25.0

@@ -1,0 +1,40 @@
+# config/train_config.yaml
+# All hyperparameters live here — versioned in git, tracked by W&B.
+# Changing a number in a notebook and forgetting it is how experiments die.
+
+model:
+  base: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+  task: "causal-lm"
+
+peft:                         # QLoRA — fine-tune on a single GPU
+  method: "qlora"
+  r: 11
+  lora_alpha: 30
+  lora_dropout: 0.05
+  target_modules: ["q_proj", "v_proj"]
+  bits: 4                     # 4-bit quantisation via bitsandbytes
+
+training:
+  epochs: 6
+  batch_size: 4
+  gradient_accumulation_steps: 4
+  learning_rate: 2.0e-5
+  lr_scheduler: "cosine"
+  warmup_ratio: 0.03
+  max_seq_length: 1024
+  fp16: true
+
+data:
+  train_file: "data/train.jsonl"
+  val_file: "data/val.jsonl"
+  prompt_version: "v2"        # which prompts/vX.yaml to use
+
+output:
+  dir: "checkpoints/"
+  save_steps: 100
+  logging_steps: 10
+
+wandb:
+  project: "mlops-demo"
+  entity: null                # set via WANDB_ENTITY env var
+  tags: ["qlora", "tinyllama-1.1b", "rag"]

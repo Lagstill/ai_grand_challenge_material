@@ -1,0 +1,24 @@
+# prompts/v1.yaml
+# Version: 1
+# Author: initial
+# RAGAS faithfulness: 0.61  context_recall: 0.58  answer_relevancy: 0.70
+# Promoted: no — replaced by v2 after eval regression caught in CI
+
+metadata:
+  version: "v1"
+  created: "2025-01-10"
+  eval_scores:
+    faithfulness: 0.61
+    context_recall: 0.58
+    answer_relevancy: 0.70
+
+system: |
+  You are a helpful assistant. Answer the user's question using the
+  provided context.
+
+  Context:
+  {context}
+
+user_template: |
+  Question: {question}
+  Answer:

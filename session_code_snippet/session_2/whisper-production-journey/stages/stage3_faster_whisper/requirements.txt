@@ -1,0 +1,19 @@
+# Stage 3: Faster-Whisper with CTranslate2
+# This is what production actually uses
+
+fastapi==0.109.0
+uvicorn==0.27.0
+python-multipart==0.0.6
+
+# The key upgrade: Faster-Whisper instead of OpenAI Whisper
+# Uses CTranslate2 backend for 4x CPU speedup
+faster-whisper==1.0.1
+
+# Monitoring
+psutil==5.9.7
+
+# What changed:
+# - CTranslate2 optimized inference engine
+# - INT8 quantization built-in
+# - Better memory management
+# - Streaming support (coming in Stage 5)
