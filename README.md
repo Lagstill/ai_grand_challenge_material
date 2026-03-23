@@ -1,6 +1,6 @@
 # AI Grand Challenge Material
 
-**IIT Delhi AI Grand Challenge — Workshop Materials**
+**AI Grand Challenge — Workshop Materials**
 
 > Comprehensive hands-on materials for building production-ready AI/ML systems.
 
@@ -116,4 +116,4 @@ cat README.md
 
 ## 📝 License
 
-Materials for IIT Delhi AI Grand Challenge Workshop.
+Materials for AI Grand Challenge Workshop.
